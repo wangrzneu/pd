@@ -539,7 +539,7 @@ Usage:
 }
 ```
 
-### `scheduler [show | add | remove]`
+### `scheduler [show | add | remove | pause | resume | config ]`
 
 Use this command to view and control the scheduling policy.
 
@@ -553,6 +553,66 @@ Usage:
 >> scheduler add shuffle-region-scheduler     // Randomly scheduling the regions on different stores
 >> scheduler remove grant-leader-scheduler-1  // Remove the corresponding scheduler
 ```
+
+#### `scheduler config balance-hot-region-scheduler [list | set]`
+
+Use this command to view and control the balance-hot-region-scheduler policy.
+
+Usage:
+
+```bash
+>> scheduler config balance-hot-region-scheduler  // Display all config
+{
+  "min-hot-byte-rate": 100,
+  "min-hot-key-rate": 10,
+  "max-zombie-rounds": 3,
+  "max-peer-number": 1000,
+  "byte-rate-rank-step-ratio": 0.05,
+  "key-rate-rank-step-ratio": 0.05,
+  "count-rank-step-ratio": 0.01,
+  "great-dec-ratio": 0.95,
+  "minor-dec-ratio": 0.99,
+  "src-tolerance-ratio": 1.02,
+  "dst-tolerance-ratio": 1.02
+}
+```
+
+- `min-hot-byte-rate` means the smallest byte counted, it is usually 100
+
+    ```bash
+    >> scheduler config balance-hot-region-scheduler set min-hot-byte-rate 100
+    ```
+- `min-hot-key-rate` means the smallest key counted, it is usually 10
+
+    ```bash
+    >> scheduler config balance-hot-region-scheduler set min-hot-key-rate 10
+    ```
+
+- `max-zombie-rounds` means the maximum number of heartbeat thatan operator is considered as a pending influence.
+
+    ```bash
+    >> scheduler config balance-hot-region-scheduler set max-zombie-rounds 3
+    ```
+- `max-peer-number` means the maximum number to solve, prevent scheduler too slow.
+
+    ```bash
+    >> scheduler config balance-hot-region-scheduler set max-peer-number 1000
+    ```
+
+- `byte-rate-rank-step-ratio`,`key-rate-rank-step-ratio`,`count-rank-step-ratio` means that step rank of  byte,key and count.Rank step ratio decide the step when calculate rank. `great-dec-ratio`,`minor-dec-ratio` are used to judge the dec rank. Usually we do not need to be modified them.
+
+    ```bash
+    >> scheduler config balance-hot-region-scheduler set byte-rate-rank-step-ratio 0.05
+    ```
+
+- `src-tolerance-ratio` and `dst-tolerance-ratio` are config for expectation scheduler. The smaller the `tolerance-ratio` , the easier it is to schedule.
+
+    ```bash
+    >> scheduler config balance-hot-region-scheduler set src-tolerance-ratio 1.05
+    ```
+
+
+
 
 ### `store [delete | label | weight | remove-tombstone | limit] <store_id>  [--jq="<query string>"]`
 
