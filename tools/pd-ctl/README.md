@@ -5,7 +5,7 @@ pd-ctl is a command line tool for PD, pd-ctl obtains the state information of th
 
 ## Build
 1. [Go](https://golang.org/) Version 1.9 or later
-2. In the root directory of the [PD project](https://github.com/pingcap/pd), use the `make` command to compile and generate `bin/pd-ctl`
+2. In the root directory of the [PD project](https://github.com/pingcap/pd), use the `make` or `make pd-ctl` command to compile and generate `bin/pd-ctl`
 
 > **Note:** Generally, you don't need to compile source code as the PD Control tool already exists in the released Binary or Docker. However, dev users can refer to the above instruction for compiling source code.
 
@@ -86,7 +86,7 @@ Usage:
 }
 ```
 
-### `config [show | set <option> <value>]`
+### `config [delete | show | set <option> <value> | placement-rules ]`
 
 Use this command to view or modify the configuration information.
 
@@ -96,12 +96,14 @@ Usage:
 >> config show                                // Display the config information of the replication and schedule
 {
   "replication": {
+    "enable-placement-rules": "false",
     "location-labels": "",
     "max-replicas": 3,
     "strictly-match-label": "false"
   },
   "schedule": {
     "enable-cross-table-merge": "false",
+    "enable-debug-metrics": "true",
     "enable-location-replacement": "true",
     "enable-make-up-replica": "true",
     "enable-one-way-merge": "false",
@@ -123,41 +125,10 @@ Usage:
     "patrol-region-interval": "100ms",
     "region-schedule-limit": 2048,
     "replica-schedule-limit": 64,
-    "scheduler-max-waiting-operator": 3,
-    "schedulers": {
-      "balance-hot-region-scheduler": "null",
-      "balance-leader-scheduler": "null",
-      "balance-region-scheduler": "null",
-      "label-scheduler": "null"
-    },
-    "schedulers-v2": [
-      {
-        "args": null,
-        "args-payload": "",
-        "disable": false,
-        "type": "balance-region"
-      },
-      {
-        "args": null,
-        "args-payload": "",
-        "disable": false,
-        "type": "balance-leader"
-      },
-      {
-        "args": null,
-        "args-payload": "",
-        "disable": false,
-        "type": "hot-region"
-      },
-      {
-        "args": null,
-        "args-payload": "",
-        "disable": false,
-        "type": "label"
-      }
-    ],
+    "scheduler-max-waiting-operator": 5,
     "split-merge-interval": "1h0m0s",
     "store-balance-rate": 15,
+    "store-limit-mode": "manual",
     "tolerant-size-ratio": 0
   }
 }
@@ -165,10 +136,14 @@ Usage:
 >> config show replication                    // Display the config information of replication
 {
   "max-replicas": 3,
-  "location-labels": ""
+  "location-labels": "",
+  "strictly-match-label": "false",
+  "enable-placement-rules": "false"
 }
 >> config show cluster-version                // Display the current version of the cluster, which is the current minimum version of TiKV nodes in the cluster and does not correspond to the binary version.
-"2.0.0"
+"4.1.0-alpha"
+
+>> config delete //todo
 ```
 
 - `max-snapshot-count` controls the maximum number of snapshots that a single store receives or sends out at the same time. The scheduler is restricted by this configuration to avoid taking up normal application resources. When you need to improve the speed of adding replicas or balancing, increase this value.
@@ -292,7 +267,16 @@ Usage:
 
 ```bash
 >> health                                // Display the health information
-{"health": "true"}
+[
+  {
+    "name": "hot-test-pd-0",
+    "member_id": 13155432540099656863,
+    "client_urls": [
+      "http://127.0.0.1:2379"
+    ],
+    "health": true
+  }
+]
 ```
 
 ### `hot [read | write | store]`
@@ -307,17 +291,6 @@ Usage:
 >> hot store                            // Display hot spot for all the read and write operations
 ```
 
-### `label [store <name> <value>]`
-
-Use this command to view the label information of the cluster.
-
-Usage:
-
-```bash
->> label                                // Display all labels
->> label store zone cn                  // Display all stores including the "zone":"cn" label
-```
-
 ### `member [delete | leader_priority | leader [show | resign | transfer <member_name>]]`
 
 Use this command to view the PD members, remove a specified member, or configure the priority of leader.
@@ -327,6 +300,7 @@ Usage:
 ```bash
 >> member                               // Display the information of all members
 {
+  "header":{......},
   "members": [......],
   "leader": {......},
   "etcd_leader": {......},
@@ -337,9 +311,10 @@ Success!
 Success!
 >> member leader show                   // Display the leader information
 {
-  "name": "pd",
-  "addr": "http://192.168.199.229:2379",
-  "id": 9724873857558226554
+   "name": "pd",
+   "member_id": 13155432540099656863,
+   "peer_urls": [......],
+   "client_urls": [......]
 }
 >> member leader resign // Move leader away from the current member
 ......
@@ -347,7 +322,7 @@ Success!
 ......
 ```
 
-### `operator [show | add | remove]`
+### `operator [check | show | add | remove]`
 
 Use this command to view and control the scheduling operation.
 
@@ -380,8 +355,9 @@ Usage:
 >> ping
 time: 43.12698ms
 ```
+### `region`
 
-### `region <region_id> [--jq="<query string>"]`
+#### `region <region_id> [--jq="<query string>"]`
 
 Use this command to view the region information. For a jq formatted output, see [jq-formatted-json-output-usage](#jq-formatted-json-output-usage).
 
@@ -406,14 +382,14 @@ Usage:
 }
 ```
 
-### `region key [--format=raw|pb|proto|protobuf] <key>`
+#### `region key [--format=raw|pb|proto|protobuf] <key>`
 
 Use this command to query the region that a specific key resides in. It supports the raw and protobuf formats.
 
 Raw format usage (default):
 
 ```bash
->> region key abc
+>> region key abcd // avoid to use odd length hex string
 {
   "region": {
     "id": 2,
@@ -434,7 +410,7 @@ Protobuf format usage:
 }
 ```
 
-### `region sibling <region_id>`
+#### `region sibling <region_id>`
 
 Use this command to check the adjacent Regions of a specific Region.
 
@@ -448,7 +424,7 @@ Usage:
 }
 ```
 
-### `region store <store_id>`
+#### `region store <store_id>`
 
 Use this command to list all Regions of a specific store.
 
@@ -462,7 +438,7 @@ Usage:
 }
 ```
 
-### `region topread [limit]`
+#### `region topread [limit]`
 
 Use this command to list Regions with top read flow. The default value of the limit is 10.
 
@@ -476,7 +452,7 @@ Usage:
 }
 ```
 
-### `region topwrite [limit]`
+#### `region topwrite [limit]`
 
 Use this command to list Regions with top write flow. The default value of the limit is 10.
 
@@ -490,7 +466,7 @@ Usage:
 }
 ```
 
-### `region topconfver [limit]`
+#### `region topconfver [limit]`
 
 Use this command to list Regions with top conf version. The default value of the limit is 10.
 
@@ -504,7 +480,7 @@ Usage:
 }
 ```
 
-### `region topversion [limit]`
+#### `region topversion [limit]`
 
 Use this command to list Regions with top version. The default value of the limit is 10.
 
@@ -518,7 +494,7 @@ Usage:
 }
 ```
 
-### `region check [miss-peer | extra-peer | down-peer | pending-peer | offline-peer | empty-region | hist-size | hist-keys]`
+#### `region check [miss-peer | extra-peer | down-peer | pending-peer | offline-peer | empty-region | hist-size | hist-keys]`
 
 Use this command to check the Regions in abnormal conditions.
 
