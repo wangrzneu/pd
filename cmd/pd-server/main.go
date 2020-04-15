@@ -127,12 +127,6 @@ func main() {
 	log.Info("Got signal to exit", zap.String("signal", sig.String()))
 
 	svr.Close()
-	switch sig {
-	case syscall.SIGTERM:
-		exit(0)
-	default:
-		exit(1)
-	}
 }
 
 func exit(code int) {
