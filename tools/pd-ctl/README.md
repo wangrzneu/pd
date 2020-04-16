@@ -287,8 +287,6 @@ This option only works when key type is "table".
 >> config placement-rules load --group=pd --out=rule.txt // Output rules to `rule.txt`
 ```
 
-
-
 ### `health`
 
 Use this command to view the health information of the cluster.
@@ -623,9 +621,6 @@ Usage:
     >> scheduler config balance-hot-region-scheduler set src-tolerance-ratio 1.05
     ```
 
-
-
-
 ### `store [delete | label | weight | remove-tombstone | limit | limit-scene] <store_id>  [--jq="<query string>"]`
 
 Use this command to view the store information or remove a specified store. For a jq formatted output, see [jq-formatted-json-output-usage](#jq-formatted-json-output-usage).
@@ -633,21 +628,27 @@ Use this command to view the store information or remove a specified store. For 
 Usage:
 
 ```bash
->> store                        // Display information of all stores
+>> store                               // Display information of all stores
 {
   "count": 3,
   "stores": [...]
 }
->> store 1                      // Get the store with the store id of 1
+>> store 1                             // Get the store with the store id of 1
   ......
->> store delete 1               // Delete the store with the store id of 1
+>> store delete 1                      // Delete the store with the store id of 1
   ......
->> store label 1 zone cn        // Set the value of the label with the "zone" key to "cn" for the store with the store id of 1
->> store weight 1 5 10          // Set the leader weight to 5 and region weight to 10 for the store with the store id of 1
->> store remove-tombstone       // Remove stores that are in tombstone state
->> store limit                  // Show limits for all stores
->> store limit all 5            // Limit 5 operators per minute for all stores
->> store limit 1 5              // Limit 5 operators per minute for store 1
+>> store label 1 zone cn               // Set the value of the label with the "zone" key to "cn" for the store with the store id of 1
+>> store weight 1 5 10                 // Set the leader weight to 5 and region weight to 10 for the store with the store id of 1
+>> store remove-tombstone              // Remove stores that are in tombstone state
+>> store limit                         // Show limits of adding region operation for all stores
+>> store limit region-add              // Show limits of adding region operation for all stores
+>> store limit region-remove           // Show limits of removing region operation for all stores
+>> store limit all 5                   // Limit 5 adding region operations per minute for all stores
+>> store limit 1 5                     // Limit 5 adding region operations per minute for store 1
+>> store limit all 5 region-add        // Limit 5 adding region operations per minute for all stores
+>> store limit 1 5 region-add          // Limit 5 adding region operations per minute for store 1
+>> store limit 1 5 region-remove       // Limit 5 removing region operations per minute for store 1
+>> store limit all 5 region-remove     // Limit 5 removing region operations per minute for all stores
 >> store limit-scene  // Show all limit scene 
 {
   "Idle": 100,
@@ -668,22 +669,6 @@ Usage:
 >> tso 395181938313123110        // Parse TSO
 system:  2017-10-09 05:50:59 +0800 CST
 logic:  120102
-```
-
-### dynamic config
-
-```bash
->> component ids tikv // Display all tikv store
-[
-  “127.0.0.1:20160”,
-  “127.0.0.1:20161”
-]
-
->> component set tikv gc.batch-keys 1024  // Set  gc.batch-keys to 1024 for all tikv 
-
->> component set 127.0.0.1:20160 gc.batch-keys 1024  // Set  gc.batch-keys to 1024 for 127.0.0.1:20160
-
->> component show 127.0.0.1:20160 // show config
 ```
 
 
