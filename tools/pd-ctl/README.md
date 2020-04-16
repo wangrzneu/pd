@@ -143,8 +143,6 @@ Usage:
 >> config show cluster-version                // Display the current version of the cluster, which is the current minimum version of TiKV nodes in the cluster and does not correspond to the binary version.
 "4.1.0-alpha"
 
->> config delete namespace <name> [flags]
-
 >> config delete label-property <type> <key> <value> [flags]
 ```
 
