@@ -265,7 +265,7 @@ This option only works when key type is "table".
 
 #### Placement-rules
 
-[Placement Rules](<https://pingcap.com/docs-cn/stable/how-to/configure/placement-rules/#placement-rules-%E4%BD%BF%E7%94%A8%E6%96%87%E6%A1%A3>) is region rules system used to guide PD to generate corresponding schedules for different types of data.
+[Placement Rules](https://pingcap.com/docs/stable/how-to/configure/placement-rules/#placement-rules) is region rules system used to guide PD to generate corresponding schedules for different types of data.
 
 ```bash
 >> config placement-rules enable 
@@ -415,7 +415,7 @@ Use this command to query the region that a specific key resides in. It supports
 Raw format usage (default):
 
 ```bash
->> region key abcd // avoid to use odd length hex string
+>> region key abcd // need to use hex format
 {
   "region": {
     "id": 2,
