@@ -648,6 +648,14 @@ Usage:
 >> store limit                  // Show limits for all stores
 >> store limit all 5            // Limit 5 operators per minute for all stores
 >> store limit 1 5              // Limit 5 operators per minute for store 1
+>> store limit-scene  // Show all limit scene 
+{
+  "Idle": 100,
+  "Low": 50,
+  "Normal": 32,
+  "High": 12
+}
+>> store limit-scene idle 100 // set rate to 100 in the idle scene
 ```
 
 ### `tso`
@@ -661,6 +669,23 @@ Usage:
 system:  2017-10-09 05:50:59 +0800 CST
 logic:  120102
 ```
+
+### dynamic config
+
+```bash
+>> component ids tikv // Display all tikv store
+[
+  “127.0.0.1:20160”,
+  “127.0.0.1:20161”
+]
+
+>> component set tikv gc.batch-keys 1024  // Set  gc.batch-keys to 1024 for all tikv 
+
+>> component set 127.0.0.1:20160 gc.batch-keys 1024  // Set  gc.batch-keys to 1024 for 127.0.0.1:20160
+
+>> component show 127.0.0.1:20160 // show config
+```
+
 
 ## Jq formatted JSON output usage
 
