@@ -25,7 +25,7 @@ import (
 	"github.com/pingcap/failpoint"
 	"github.com/pingcap/kvproto/pkg/metapb"
 	"github.com/pingcap/kvproto/pkg/pdpb"
-	"github.com/pingcap/kvproto/pkg/replicate_mode"
+	"github.com/pingcap/kvproto/pkg/replication_modepb"
 	"github.com/pingcap/pd/v4/pkg/dashboard"
 	"github.com/pingcap/pd/v4/pkg/mock/mockid"
 	"github.com/pingcap/pd/v4/pkg/testutil"
@@ -35,7 +35,7 @@ import (
 	"github.com/pingcap/pd/v4/server/core"
 	"github.com/pingcap/pd/v4/server/kv"
 	syncer "github.com/pingcap/pd/v4/server/region_syncer"
-	"github.com/pingcap/pd/v4/server/schedule"
+	"github.com/pingcap/pd/v4/server/schedule/storelimit"
 	"github.com/pingcap/pd/v4/tests"
 	"github.com/pingcap/pd/v4/tests/pdctl"
 	"github.com/pkg/errors"
@@ -62,7 +62,7 @@ func (s *clusterTestSuite) SetUpSuite(c *C) {
 	server.EnableZap = true
 	server.ConfigCheckInterval = 1 * time.Second
 	// to prevent GetStorage
-	dashboard.CheckInterval = 30 * time.Minute
+	dashboard.SetCheckInterval(30 * time.Minute)
 }
 
 func (s *clusterTestSuite) TearDownSuite(c *C) {
@@ -193,7 +193,7 @@ func (s *clusterTestSuite) TestReloadConfig(c *C) {
 	tc.ResignLeader()
 	tc.WaitLeader()
 	leaderServer = tc.GetServer(tc.GetLeader())
-	c.Assert(leaderServer.GetServer().GetScheduleOption().GetReplication().IsPlacementRulesEnabled(), IsFalse)
+	c.Assert(leaderServer.GetServer().GetPersistOptions().GetReplication().IsPlacementRulesEnabled(), IsFalse)
 	rc = leaderServer.GetServer().GetRaftCluster()
 	r := &metapb.Region{
 		Id: 3,
@@ -210,12 +210,12 @@ func (s *clusterTestSuite) TestReloadConfig(c *C) {
 
 	// wait for checking region
 	time.Sleep(300 * time.Millisecond)
-	c.Assert(leaderServer.GetServer().GetScheduleOption().GetReplication().IsPlacementRulesEnabled(), IsFalse)
+	c.Assert(leaderServer.GetServer().GetPersistOptions().GetReplication().IsPlacementRulesEnabled(), IsFalse)
 	c.Assert(rc.GetOperatorController().GetOperator(3), IsNil)
 
 	// wait for configuration valid
 	time.Sleep(1 * time.Second)
-	c.Assert(leaderServer.GetServer().GetScheduleOption().GetReplication().IsPlacementRulesEnabled(), IsTrue)
+	c.Assert(leaderServer.GetServer().GetPersistOptions().GetReplication().IsPlacementRulesEnabled(), IsTrue)
 	c.Assert(rc.GetOperatorController().GetOperator(3), IsNil)
 }
 
@@ -275,25 +275,29 @@ func testStateAndLimit(c *C, clusterID uint64, rc *cluster.RaftCluster, grpcPDCl
 	// prepare
 	storeID := store.GetId()
 	oc := rc.GetOperatorController()
-	oc.SetAllStoresLimit(1.0, schedule.StoreLimitManual)
+	oc.SetAllStoresLimit(1.0, storelimit.Manual, storelimit.RegionAdd)
+	oc.SetAllStoresLimit(1.0, storelimit.Manual, storelimit.RegionRemove)
 	resetStoreState(c, rc, store.GetId(), beforeState)
-	_, isOKBefore := oc.GetAllStoresLimit()[storeID]
+	_, isRegionAddLimitOKBefore := oc.GetAllStoresLimit(storelimit.RegionAdd)[storeID]
+	_, isRegionRemoveLimitOKBefore := oc.GetAllStoresLimit(storelimit.RegionRemove)[storeID]
 	// run
 	err := run(rc)
 	// judge
-	_, isOKAfter := oc.GetAllStoresLimit()[storeID]
+	_, isRegionAddLimitOKAfter := oc.GetAllStoresLimit(storelimit.RegionAdd)[storeID]
+	_, isRegionRemoveLimitOKAfter := oc.GetAllStoresLimit(storelimit.RegionRemove)[storeID]
 	if len(expectStates) != 0 {
 		c.Assert(err, IsNil)
 		expectState := expectStates[0]
 		c.Assert(getStore(c, clusterID, grpcPDClient, storeID).GetState(), Equals, expectState)
 		if expectState == metapb.StoreState_Offline {
-			c.Assert(isOKAfter, IsTrue)
+			c.Assert(isRegionAddLimitOKAfter && isRegionRemoveLimitOKAfter, IsTrue)
 		} else if expectState == metapb.StoreState_Tombstone {
-			c.Assert(isOKAfter, IsFalse)
+			c.Assert(isRegionAddLimitOKAfter || isRegionRemoveLimitOKAfter, IsFalse)
 		}
 	} else {
 		c.Assert(err, NotNil)
-		c.Assert(isOKAfter, Equals, isOKBefore)
+		c.Assert(isRegionAddLimitOKAfter, Equals, isRegionAddLimitOKBefore)
+		c.Assert(isRegionRemoveLimitOKAfter, Equals, isRegionRemoveLimitOKBefore)
 	}
 }
 
@@ -610,17 +614,17 @@ func (s *clusterTestSuite) TestSetScheduleOpt(c *C) {
 	cfg.Schedule.StoreBalanceRate = 60
 	err = cfg.Adjust(nil)
 	c.Assert(err, IsNil)
-	opt := config.NewScheduleOption(cfg)
+	opt := config.NewPersistOptions(cfg)
 	c.Assert(err, IsNil)
 
 	svr := leaderServer.GetServer()
 	scheduleCfg := opt.Load()
-	replicateCfg := svr.GetReplicationConfig()
-	scheduleOpt := svr.GetScheduleOption()
-	pdServerCfg := scheduleOpt.LoadPDServerConfig()
+	replicationCfg := svr.GetReplicationConfig()
+	persistOptions := svr.GetPersistOptions()
+	pdServerCfg := persistOptions.LoadPDServerConfig()
 
 	// PUT GET DELETE succeed
-	replicateCfg.MaxReplicas = 5
+	replicationCfg.MaxReplicas = 5
 	scheduleCfg.MaxSnapshotCount = 10
 	pdServerCfg.UseRegionStorage = true
 	typ, labelKey, labelValue := "testTyp", "testKey", "testValue"
@@ -628,44 +632,44 @@ func (s *clusterTestSuite) TestSetScheduleOpt(c *C) {
 	c.Assert(svr.SetScheduleConfig(*scheduleCfg), IsNil)
 	c.Assert(svr.SetPDServerConfig(*pdServerCfg), IsNil)
 	c.Assert(svr.SetLabelProperty(typ, labelKey, labelValue), IsNil)
-	c.Assert(svr.SetReplicationConfig(*replicateCfg), IsNil)
+	c.Assert(svr.SetReplicationConfig(*replicationCfg), IsNil)
 
 	c.Assert(svr.GetReplicationConfig().MaxReplicas, Equals, uint64(5))
-	c.Assert(scheduleOpt.GetMaxSnapshotCount(), Equals, uint64(10))
-	c.Assert(scheduleOpt.LoadPDServerConfig().UseRegionStorage, Equals, true)
-	c.Assert(scheduleOpt.LoadLabelPropertyConfig()[typ][0].Key, Equals, "testKey")
-	c.Assert(scheduleOpt.LoadLabelPropertyConfig()[typ][0].Value, Equals, "testValue")
+	c.Assert(persistOptions.GetMaxSnapshotCount(), Equals, uint64(10))
+	c.Assert(persistOptions.LoadPDServerConfig().UseRegionStorage, Equals, true)
+	c.Assert(persistOptions.LoadLabelPropertyConfig()[typ][0].Key, Equals, "testKey")
+	c.Assert(persistOptions.LoadLabelPropertyConfig()[typ][0].Value, Equals, "testValue")
 
 	c.Assert(svr.DeleteLabelProperty(typ, labelKey, labelValue), IsNil)
 
-	c.Assert(len(scheduleOpt.LoadLabelPropertyConfig()[typ]), Equals, 0)
+	c.Assert(len(persistOptions.LoadLabelPropertyConfig()[typ]), Equals, 0)
 
 	// PUT GET failed
 	oldStorage := svr.GetStorage()
 	svr.SetStorage(core.NewStorage(&testErrorKV{}))
-	replicateCfg.MaxReplicas = 7
+	replicationCfg.MaxReplicas = 7
 	scheduleCfg.MaxSnapshotCount = 20
 	pdServerCfg.UseRegionStorage = false
 
 	c.Assert(svr.SetScheduleConfig(*scheduleCfg), NotNil)
-	c.Assert(svr.SetReplicationConfig(*replicateCfg), NotNil)
+	c.Assert(svr.SetReplicationConfig(*replicationCfg), NotNil)
 	c.Assert(svr.SetPDServerConfig(*pdServerCfg), NotNil)
 	c.Assert(svr.SetLabelProperty(typ, labelKey, labelValue), NotNil)
 
 	c.Assert(svr.GetReplicationConfig().MaxReplicas, Equals, uint64(5))
-	c.Assert(scheduleOpt.GetMaxSnapshotCount(), Equals, uint64(10))
-	c.Assert(scheduleOpt.LoadPDServerConfig().UseRegionStorage, Equals, true)
-	c.Assert(len(scheduleOpt.LoadLabelPropertyConfig()[typ]), Equals, 0)
+	c.Assert(persistOptions.GetMaxSnapshotCount(), Equals, uint64(10))
+	c.Assert(persistOptions.LoadPDServerConfig().UseRegionStorage, Equals, true)
+	c.Assert(len(persistOptions.LoadLabelPropertyConfig()[typ]), Equals, 0)
 
 	// DELETE failed
 	svr.SetStorage(oldStorage)
-	c.Assert(svr.SetReplicationConfig(*replicateCfg), IsNil)
+	c.Assert(svr.SetReplicationConfig(*replicationCfg), IsNil)
 
 	svr.SetStorage(core.NewStorage(&testErrorKV{}))
 	c.Assert(svr.DeleteLabelProperty(typ, labelKey, labelValue), NotNil)
 
-	c.Assert(scheduleOpt.LoadLabelPropertyConfig()[typ][0].Key, Equals, "testKey")
-	c.Assert(scheduleOpt.LoadLabelPropertyConfig()[typ][0].Value, Equals, "testValue")
+	c.Assert(persistOptions.LoadLabelPropertyConfig()[typ][0].Key, Equals, "testKey")
+	c.Assert(persistOptions.LoadLabelPropertyConfig()[typ][0].Value, Equals, "testValue")
 	svr.SetStorage(oldStorage)
 }
 
@@ -683,7 +687,7 @@ func (s *clusterTestSuite) TestLoadClusterInfo(c *C) {
 	rc := cluster.NewRaftCluster(s.ctx, svr.GetClusterRootPath(), svr.ClusterID(), syncer.NewRegionSyncer(svr), svr.GetClient())
 
 	// Cluster is not bootstrapped.
-	rc.InitCluster(svr.GetAllocator(), svr.GetScheduleOption(), svr.GetStorage(), svr.GetBasicCluster(), func() {})
+	rc.InitCluster(svr.GetAllocator(), svr.GetPersistOptions(), svr.GetStorage(), svr.GetBasicCluster(), func() {})
 	raftCluster, err := rc.LoadClusterInfo()
 	c.Assert(err, IsNil)
 	c.Assert(raftCluster, IsNil)
@@ -796,9 +800,9 @@ func (s *clusterTestSuite) TestTiFlashWithPlacementRules(c *C) {
 	c.Assert(err, IsNil)
 }
 
-func (s *clusterTestSuite) TestReplicateModeStatus(c *C) {
+func (s *clusterTestSuite) TestReplicationModeStatus(c *C) {
 	tc, err := tests.NewTestCluster(s.ctx, 1, func(conf *config.Config) {
-		conf.ReplicateMode.ReplicateMode = "dr_autosync"
+		conf.ReplicationMode.ReplicationMode = "dr_auto_sync"
 	})
 
 	defer tc.Destroy()
@@ -812,18 +816,18 @@ func (s *clusterTestSuite) TestReplicateModeStatus(c *C) {
 	req := newBootstrapRequest(c, clusterID, "127.0.0.1:0")
 	res, err := grpcPDClient.Bootstrap(context.Background(), req)
 	c.Assert(err, IsNil)
-	c.Assert(res.GetReplicateStatus().GetMode(), Equals, replicate_mode.ReplicateStatus_DR_AUTOSYNC) // check status in bootstrap response
+	c.Assert(res.GetReplicationStatus().GetMode(), Equals, replication_modepb.ReplicationMode_DR_AUTO_SYNC) // check status in bootstrap response
 	store := &metapb.Store{Id: 11, Address: "127.0.0.1:1", Version: "v4.1.0"}
 	putRes, err := putStore(c, grpcPDClient, clusterID, store)
 	c.Assert(err, IsNil)
-	c.Assert(putRes.GetReplicateStatus().GetMode(), Equals, replicate_mode.ReplicateStatus_DR_AUTOSYNC) // check status in putStore response
+	c.Assert(putRes.GetReplicationStatus().GetMode(), Equals, replication_modepb.ReplicationMode_DR_AUTO_SYNC) // check status in putStore response
 	hbReq := &pdpb.StoreHeartbeatRequest{
 		Header: testutil.NewRequestHeader(clusterID),
 		Stats:  &pdpb.StoreStats{StoreId: store.GetId()},
 	}
 	hbRes, err := grpcPDClient.StoreHeartbeat(context.Background(), hbReq)
 	c.Assert(err, IsNil)
-	c.Assert(hbRes.GetReplicateStatus().GetMode(), Equals, replicate_mode.ReplicateStatus_DR_AUTOSYNC) // check status in store heartbeat response
+	c.Assert(hbRes.GetReplicationStatus().GetMode(), Equals, replication_modepb.ReplicationMode_DR_AUTO_SYNC) // check status in store heartbeat response
 }
 
 func newIsBootstrapRequest(clusterID uint64) *pdpb.IsBootstrappedRequest {
