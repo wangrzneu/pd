@@ -263,6 +263,32 @@ This option only works when key type is "table".
 
 - `enable-debug-metrics` is used to enable the debug metrics. When you set it to `true`, PD will open some metrics, such as balance-tolerant-size and op influence.
 
+- `store-limit-mode` has two mode for setting limit: auto or manual, an auto-set value can be overwritten by a manual-set value, otherwise it is forbidden.
+
+#### Placement-rules
+
+[Placement Rules](<https://pingcap.com/docs-cn/stable/how-to/configure/placement-rules/#placement-rules-%E4%BD%BF%E7%94%A8%E6%96%87%E6%A1%A3>) is region rules system used to guide PD to generate corresponding schedules for different types of data.
+
+```bash
+>> config placement-rules enable 
+
+>> config placement-rules disable
+
+>> config placement-rules show // Display all placement-rules
+
+>> config placement-rules show --group=pd // Display all placement-rules in pd group
+
+>> config placement-rules show --group=pd --id=default // Display placement-rule in pd group and with id.
+
+>> config placement-rules show --region=2 // Display placement-rule with region
+
+>> config placement-rules save --in=rules.json // Set rules with rules.json
+
+>> config placement-rules load --group=pd --out=rule.txt // Output rules to `rule.txt`
+```
+
+
+
 ### `health`
 
 Use this command to view the health information of the cluster.
