@@ -143,7 +143,9 @@ Usage:
 >> config show cluster-version                // Display the current version of the cluster, which is the current minimum version of TiKV nodes in the cluster and does not correspond to the binary version.
 "4.1.0-alpha"
 
->> config delete //todo
+>> config delete namespace <name> [flags]
+
+>> config delete label-property <type> <key> <value> [flags]
 ```
 
 - `max-snapshot-count` controls the maximum number of snapshots that a single store receives or sends out at the same time. The scheduler is restricted by this configuration to avoid taking up normal application resources. When you need to improve the speed of adding replicas or balancing, increase this value.
@@ -164,10 +166,10 @@ Usage:
     >> config set max-merge-region-size 16 // Set the upper limit on the size of Region Merge to 16M
     ```
 
-- `max-merge-region-rows` controls the upper limit on the row count of Region Merge. When `regionRowCount` exceeds the specified value, PD does not merge it with the adjacent Region.
+- `max-merge-region-keys` controls the upper limit on the key count of Region Merge. When `regionKey` exceeds the specified value, PD does not merge it with the adjacent Region.
 
     ```bash
-    >> config set max-merge-region-rows 50000 // Set the the upper limit on rowCount to 50000
+    >> config set max-merge-region-keys 50000 // Set the the upper limit on regionKey to 50000
     ```
 
 - `split-merge-interval` controls the interval between the `split` and `merge` operations on a same Region. This means the newly split Region won't be merged within a period of time.
@@ -258,6 +260,8 @@ This option only works when key type is "table".
 - `enable-remove-extra-replica` is used to enable the feature of removing extra replicas. When you set it to `false`, PD does not remove extra replicas for Regions with redundant replicas.
 
 - `enable-location-replacement` is used to enable the isolation level check. When you set it to `false`, PD does not improve the isolation level of Region replicas by scheduling.
+
+- `enable-debug-metrics` is used to enable the debug metrics. When you set it to `true`, PD will open some metrics, such as balance-tolerant-size and op influence.
 
 ### `health`
 
@@ -581,7 +585,7 @@ Usage:
     >> scheduler config balance-hot-region-scheduler set byte-rate-rank-step-ratio 0.05
     ```
 
-- `src-tolerance-ratio` and `dst-tolerance-ratio` are config for expectation scheduler. The smaller the `tolerance-ratio` , the easier it is to schedule.
+- `src-tolerance-ratio` and `dst-tolerance-ratio` are config for expectation scheduler. The smaller the `tolerance-ratio` , the easier it is to schedule. When redundant scheduling occurs, we can appropriately increase this.
 
     ```bash
     >> scheduler config balance-hot-region-scheduler set src-tolerance-ratio 1.05
