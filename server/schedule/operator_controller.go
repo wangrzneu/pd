@@ -448,15 +448,17 @@ func (oc *OperatorController) addOperatorLocked(op *operator.Operator) bool {
 			continue
 		}
 		for n, v := range storelimit.TypeNameValue {
-			if oc.storesLimit[storeID][v] == nil {
+			storeLimit := oc.storesLimit[storeID][v]
+			if storeLimit == nil {
 				continue
 			}
 			stepCost := opInfluence.GetStoreInfluence(storeID).GetStepCost(v)
 			if stepCost == 0 {
 				continue
 			}
-			storeLimitGauge.WithLabelValues(strconv.FormatUint(storeID, 10), "take", n).Set(float64(stepCost) / float64(storelimit.RegionInfluence[v]))
-			oc.storesLimit[storeID][v].Take(stepCost)
+			storeLimit.Take(stepCost)
+			storeLimitCostCounter.WithLabelValues(strconv.FormatUint(storeID, 10), n).Add(float64(stepCost) / float64(storelimit.RegionInfluence[v]))
+			storeLimitAvailableGauge.WithLabelValues(strconv.FormatUint(storeID, 10), n).Set(float64(storeLimit.Available()) / float64(storelimit.RegionInfluence[v]))
 		}
 	}
 	oc.updateCounts(oc.operators)
@@ -864,14 +866,12 @@ func (o *OperatorRecords) Put(op *operator.Operator) {
 func (oc *OperatorController) exceedStoreLimit(ops ...*operator.Operator) bool {
 	opInfluence := NewTotalOpInfluence(ops, oc.cluster)
 	for storeID := range opInfluence.StoresInfluence {
-		for n, v := range storelimit.TypeNameValue {
+		for _, v := range storelimit.TypeNameValue {
 			stepCost := opInfluence.GetStoreInfluence(storeID).GetStepCost(v)
 			if stepCost == 0 {
 				continue
 			}
-			available := oc.getOrCreateStoreLimit(storeID, v).Available()
-			storeLimitGauge.WithLabelValues(strconv.FormatUint(storeID, 10), "available", n).Set(float64(available) / float64(storelimit.RegionInfluence[v]))
-			if available < stepCost {
+			if oc.getOrCreateStoreLimit(storeID, v).Available() < stepCost {
 				return true
 			}
 		}
