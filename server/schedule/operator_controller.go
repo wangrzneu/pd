@@ -458,7 +458,6 @@ func (oc *OperatorController) addOperatorLocked(op *operator.Operator) bool {
 			}
 			storeLimit.Take(stepCost)
 			storeLimitCostCounter.WithLabelValues(strconv.FormatUint(storeID, 10), n).Add(float64(stepCost) / float64(storelimit.RegionInfluence[v]))
-			storeLimitAvailableGauge.WithLabelValues(strconv.FormatUint(storeID, 10), n).Set(float64(storeLimit.Available()) / float64(storelimit.RegionInfluence[v]))
 		}
 	}
 	oc.updateCounts(oc.operators)
@@ -972,4 +971,28 @@ func (oc *OperatorController) RemoveStoreLimit(storeID uint64) {
 		oc.cluster.AttachAvailableFunc(storeID, limitType, nil)
 	}
 	delete(oc.storesLimit, storeID)
+}
+
+func (oc *OperatorController) CollectStoreLimitMetrics() {
+	oc.RLock()
+	defer oc.RUnlock()
+	if oc.storesLimit == nil {
+		return
+	}
+	stores := oc.cluster.GetStores()
+	for _, store := range stores {
+		if store != nil {
+			storeID := store.GetID()
+			if oc.storesLimit[storeID] == nil {
+				continue
+			}
+			for n, v := range storelimit.TypeNameValue {
+				storeLimit := oc.storesLimit[storeID][v]
+				if storeLimit == nil {
+					continue
+				}
+				storeLimitAvailableGauge.WithLabelValues(strconv.FormatUint(storeID, 10), n).Set(float64(storeLimit.Available()) / float64(storelimit.RegionInfluence[v]))
+			}
+		}
+	}
 }
