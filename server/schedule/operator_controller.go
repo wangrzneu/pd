@@ -973,6 +973,7 @@ func (oc *OperatorController) RemoveStoreLimit(storeID uint64) {
 	delete(oc.storesLimit, storeID)
 }
 
+// CollectStoreLimitMetrics collects the metrics about store limit
 func (oc *OperatorController) CollectStoreLimitMetrics() {
 	oc.RLock()
 	defer oc.RUnlock()
