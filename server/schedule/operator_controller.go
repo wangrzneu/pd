@@ -992,7 +992,9 @@ func (oc *OperatorController) CollectStoreLimitMetrics() {
 				if storeLimit == nil {
 					continue
 				}
-				storeLimitAvailableGauge.WithLabelValues(strconv.FormatUint(storeID, 10), n).Set(float64(storeLimit.Available()) / float64(storelimit.RegionInfluence[v]))
+				storeIDStr := strconv.FormatUint(storeID, 10)
+				storeLimitAvailableGauge.WithLabelValues(storeIDStr, n).Set(float64(storeLimit.Available()) / float64(storelimit.RegionInfluence[v]))
+				storeLimitRateGauge.WithLabelValues(storeIDStr, n).Set(storeLimit.Rate() * StoreBalanceBaseTime)
 			}
 		}
 	}
