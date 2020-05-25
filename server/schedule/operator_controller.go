@@ -925,7 +925,7 @@ func (oc *OperatorController) newStoreLimit(storeID uint64, rate float64, mode s
 // getOrCreateStoreLimit is used to get or create the limit of a store.
 func (oc *OperatorController) getOrCreateStoreLimit(storeID uint64, limitType storelimit.Type) *storelimit.StoreLimit {
 	if oc.storesLimit[storeID][limitType] == nil {
-		rate := oc.cluster.GetStoreBalanceRate() / StoreBalanceBaseTime
+		rate := oc.getDefaultStoreLimitRate()
 		oc.newStoreLimit(storeID, rate, storelimit.Auto, limitType)
 		oc.cluster.AttachAvailableFunc(storeID, limitType, func() bool {
 			oc.RLock()
@@ -984,18 +984,22 @@ func (oc *OperatorController) CollectStoreLimitMetrics() {
 	for _, store := range stores {
 		if store != nil {
 			storeID := store.GetID()
-			if oc.storesLimit[storeID] == nil {
-				continue
-			}
+			storeIDStr := strconv.FormatUint(storeID, 10)
 			for n, v := range storelimit.TypeNameValue {
-				storeLimit := oc.storesLimit[storeID][v]
-				if storeLimit == nil {
+				var storeLimit *storelimit.StoreLimit
+				if oc.storesLimit[storeID] == nil || oc.storesLimit[storeID][v] == nil {
+					// the default store limit config
+					storeLimitRateGauge.WithLabelValues(storeIDStr, n).Set(oc.getDefaultStoreLimitRate() * StoreBalanceBaseTime)
 					continue
 				}
-				storeIDStr := strconv.FormatUint(storeID, 10)
+				storeLimit = oc.storesLimit[storeID][v]
 				storeLimitAvailableGauge.WithLabelValues(storeIDStr, n).Set(float64(storeLimit.Available()) / float64(storelimit.RegionInfluence[v]))
 				storeLimitRateGauge.WithLabelValues(storeIDStr, n).Set(storeLimit.Rate() * StoreBalanceBaseTime)
 			}
 		}
 	}
+}
+
+func (oc *OperatorController) getDefaultStoreLimitRate() float64 {
+	return oc.cluster.GetStoreBalanceRate() / StoreBalanceBaseTime
 }
