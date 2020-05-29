@@ -14,6 +14,7 @@
 package core
 
 import (
+	"bytes"
 	"sync"
 
 	"github.com/pingcap/kvproto/pkg/metapb"
@@ -288,13 +289,15 @@ func (bc *BasicCluster) TakeStore(storeID uint64) *StoreInfo {
 // PreCheckPutRegion checks if the region is valid to put.
 func (bc *BasicCluster) PreCheckPutRegion(region *RegionInfo) (*RegionInfo, error) {
 	bc.RLock()
-	for _, item := range bc.Regions.GetOverlaps(region) {
-		if region.GetRegionEpoch().GetVersion() < item.GetRegionEpoch().GetVersion() {
-			bc.RUnlock()
-			return nil, ErrRegionIsStale(region.GetMeta(), item.GetMeta())
+	origin := bc.Regions.GetRegion(region.GetID())
+	if origin == nil || !bytes.Equal(origin.GetStartKey(), region.GetStartKey()) || !bytes.Equal(origin.GetEndKey(), region.GetEndKey()) {
+		for _, item := range bc.Regions.GetOverlaps(region) {
+			if region.GetRegionEpoch().GetVersion() < item.GetRegionEpoch().GetVersion() {
+				bc.RUnlock()
+				return nil, ErrRegionIsStale(region.GetMeta(), item.GetMeta())
+			}
 		}
 	}
-	origin := bc.Regions.GetRegion(region.GetID())
 	bc.RUnlock()
 	if origin == nil {
 		return nil, nil
@@ -319,7 +322,7 @@ func (bc *BasicCluster) PutRegion(region *RegionInfo) []*RegionInfo {
 func (bc *BasicCluster) CheckAndPutRegion(region *RegionInfo) []*RegionInfo {
 	origin, err := bc.PreCheckPutRegion(region)
 	if err != nil {
-		log.Warn("region is stale", zap.Error(err), zap.Stringer("origin", origin.GetMeta()))
+		log.Debug("region is stale", zap.Error(err), zap.Stringer("origin", origin.GetMeta()))
 		// return the state region to delete.
 		return []*RegionInfo{region}
 	}
