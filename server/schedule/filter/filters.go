@@ -597,7 +597,7 @@ func NewSpecialUseFilter(scope string, allowUses ...string) Filter {
 	}
 	return &specialUseFilter{
 		scope:      scope,
-		constraint: placement.LabelConstraint{Key: SpecialUseKey, Op: "in", Values: values},
+		constraint: placement.LabelConstraint{Key: core.SpecialUseLabel, Op: "in", Values: values},
 	}
 }
 
@@ -620,19 +620,5 @@ func (f *specialUseFilter) Target(opt opt.Options, store *core.StoreInfo) bool {
 	return !f.constraint.MatchStore(store)
 }
 
-const (
-	// SpecialUseKey is the label used to indicate special use storage.
-	SpecialUseKey = "specialUse"
-	// SpecialUseHotRegion is the hot region value of special use label
-	SpecialUseHotRegion = "hotRegion"
-	// SpecialUseReserved is the reserved value of special use label
-	SpecialUseReserved = "reserved"
-
-	// EngineKey is the label key used to indicate engine.
-	EngineKey = "engine"
-	// EngineTiFlash is the tiflash value of the engine label.
-	EngineTiFlash = "tiflash"
-)
-
-var allSpecialUses = []string{SpecialUseHotRegion, SpecialUseReserved}
-var allSpeicalEngines = []string{EngineTiFlash}
+var allSpecialUses = []string{core.SpecialUseHotRegion, core.SpecialUseReserved}
+var allSpeicalEngines = []string{core.EngineTiFlash}

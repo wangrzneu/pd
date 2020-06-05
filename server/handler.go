@@ -16,6 +16,7 @@ package server
 import (
 	"bytes"
 	"encoding/hex"
+	"encoding/json"
 	"net/http"
 	"path"
 	"strconv"
@@ -841,15 +842,35 @@ func (h *Handler) ResetTS(ts uint64) error {
 }
 
 // SetStoreLimitScene sets the limit values for differents scenes
-func (h *Handler) SetStoreLimitScene(scene *storelimit.Scene, limitType storelimit.Type) {
+func (h *Handler) SetStoreLimitScene(scene *storelimit.Scene, limitType storelimit.Type, engine core.Engine) {
 	cluster := h.s.GetRaftCluster()
-	cluster.GetStoreLimiter().ReplaceStoreLimitScene(scene, limitType)
+	cluster.GetStoreLimiter().ReplaceStoreLimitScene(scene, limitType, engine)
 }
 
 // GetStoreLimitScene returns the limit valus for different scenes
-func (h *Handler) GetStoreLimitScene(limitType storelimit.Type) *storelimit.Scene {
+func (h *Handler) GetStoreLimitScene(limitType storelimit.Type, engine core.Engine) *storelimit.Scene {
 	cluster := h.s.GetRaftCluster()
-	return cluster.GetStoreLimiter().StoreLimitScene(limitType)
+	scene := cluster.GetStoreLimiter().StoreLimitScene(limitType, engine)
+	return scene
+}
+
+func (h *Handler) GetAllEngineStoreLimitScene(limitType storelimit.Type) map[string]interface{} {
+	cluster := h.s.GetRaftCluster()
+	sceneTotal := make(map[string]interface{})
+	engineIgnoreScene := cluster.GetStoreLimiter().StoreLimitScene(limitType, core.Unspecified)
+	if engineIgnoreScene != nil {
+		jsonBytes, _ := json.Marshal(engineIgnoreScene)
+		json.Unmarshal(jsonBytes, &sceneTotal)
+	}
+	for n, v := range core.EngineNameValue {
+		if v != core.Unspecified {
+			scene := make(map[string]interface{})
+			jsonBytes, _ := json.Marshal(cluster.GetStoreLimiter().StoreLimitScene(limitType, v))
+			json.Unmarshal(jsonBytes, &scene)
+			sceneTotal[n] = scene
+		}
+	}
+	return sceneTotal
 }
 
 // PluginLoad loads the plugin referenced by the pluginPath

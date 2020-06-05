@@ -16,6 +16,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"github.com/pingcap/pd/v4/server/core"
 	"math/rand"
 	"path"
 	"time"
@@ -187,7 +188,7 @@ func checkBootstrapRequest(clusterID uint64, req *pdpb.BootstrapRequest) error {
 // FIXME: remove the hack way
 func isTiFlashStore(store *metapb.Store) bool {
 	for _, l := range store.GetLabels() {
-		if l.GetKey() == "engine" && l.GetValue() == "tiflash" {
+		if l.GetKey() == core.EngineLabel && l.GetValue() == core.EngineTiFlash {
 			return true
 		}
 	}

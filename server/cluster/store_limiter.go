@@ -14,6 +14,7 @@
 package cluster
 
 import (
+	"github.com/pingcap/pd/v4/server/core"
 	"sync"
 
 	"github.com/pingcap/kvproto/pkg/pdpb"
@@ -27,16 +28,18 @@ import (
 type StoreLimiter struct {
 	m       sync.RWMutex
 	oc      *schedule.OperatorController
-	scene   map[storelimit.Type]*storelimit.Scene
+	scene   map[core.Engine]map[storelimit.Type]*storelimit.Scene
 	state   *State
 	current LoadState
 }
 
 // NewStoreLimiter builds a store limiter object using the operator controller
 func NewStoreLimiter(c *schedule.OperatorController) *StoreLimiter {
-	defaultScene := map[storelimit.Type]*storelimit.Scene{
-		storelimit.RegionAdd:    storelimit.DefaultScene(storelimit.RegionAdd),
-		storelimit.RegionRemove: storelimit.DefaultScene(storelimit.RegionRemove),
+	defaultScene := map[core.Engine]map[storelimit.Type]*storelimit.Scene{
+		core.Unspecified: {
+			storelimit.RegionAdd:    storelimit.DefaultScene(storelimit.RegionAdd),
+			storelimit.RegionRemove: storelimit.DefaultScene(storelimit.RegionRemove),
+		},
 	}
 
 	return &StoreLimiter{
@@ -65,7 +68,7 @@ func (s *StoreLimiter) Collect(stats *pdpb.StoreStats) {
 			log.Info("change store region add limit for cluster", zap.Stringer("state", state), zap.Float64("rate", rateRegionAdd))
 		}
 		if rateRegionRemove > 0 {
-			s.oc.SetAllStoresLimitAuto(rateRegionAdd, storelimit.RegionRemove)
+			s.oc.SetAllStoresLimitAuto(rateRegionRemove, storelimit.RegionRemove)
 			log.Info("change store region remove limit for cluster", zap.Stringer("state", state), zap.Float64("rate", rateRegionRemove))
 		}
 		s.current = state
@@ -83,34 +86,34 @@ func collectClusterStateCurrent(state LoadState) {
 	}
 }
 
-func (s *StoreLimiter) calculateRate(limitType storelimit.Type, state LoadState) float64 {
+func (s *StoreLimiter) calculateRate(limitType storelimit.Type, engine core.Engine, state LoadState) float64 {
 	rate := float64(0)
 	switch state {
 	case LoadStateIdle:
-		rate = float64(s.scene[limitType].Idle) / schedule.StoreBalanceBaseTime
+		rate = float64(s.scene[engine][limitType].Idle) / schedule.StoreBalanceBaseTime
 	case LoadStateLow:
-		rate = float64(s.scene[limitType].Low) / schedule.StoreBalanceBaseTime
+		rate = float64(s.scene[engine][limitType].Low) / schedule.StoreBalanceBaseTime
 	case LoadStateNormal:
-		rate = float64(s.scene[limitType].Normal) / schedule.StoreBalanceBaseTime
+		rate = float64(s.scene[engine][limitType].Normal) / schedule.StoreBalanceBaseTime
 	case LoadStateHigh:
-		rate = float64(s.scene[limitType].High) / schedule.StoreBalanceBaseTime
+		rate = float64(s.scene[engine][limitType].High) / schedule.StoreBalanceBaseTime
 	}
 	return rate
 }
 
 // ReplaceStoreLimitScene replaces the store limit values for different scenes
-func (s *StoreLimiter) ReplaceStoreLimitScene(scene *storelimit.Scene, limitType storelimit.Type) {
+func (s *StoreLimiter) ReplaceStoreLimitScene(scene *storelimit.Scene, limitType storelimit.Type, engine core.Engine, ) {
 	s.m.Lock()
 	defer s.m.Unlock()
 	if s.scene == nil {
-		s.scene = make(map[storelimit.Type]*storelimit.Scene)
+		s.scene = make(map[core.Engine]map[storelimit.Type]*storelimit.Scene)
 	}
-	s.scene[limitType] = scene
+	s.scene[engine][limitType] = scene
 }
 
 // StoreLimitScene returns the current limit for different scenes
-func (s *StoreLimiter) StoreLimitScene(limitType storelimit.Type) *storelimit.Scene {
+func (s *StoreLimiter) StoreLimitScene(limitType storelimit.Type, engine core.Engine) *storelimit.Scene {
 	s.m.RLock()
 	defer s.m.RUnlock()
-	return s.scene[limitType]
+	return s.scene[engine][limitType]
 }

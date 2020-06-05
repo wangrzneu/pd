@@ -501,11 +501,17 @@ func (h *storesHandler) SetStoreLimitScene(w http.ResponseWriter, r *http.Reques
 		h.rd.JSON(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	scene := h.Handler.GetStoreLimitScene(typeValue)
+	engineName := r.URL.Query().Get("engine")
+	engineValue, err := parseEngine(engineName)
+	if err != nil {
+		h.rd.JSON(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	scene := h.Handler.GetStoreLimitScene(typeValue, engineValue)
 	if err := apiutil.ReadJSONRespondError(h.rd, w, r.Body, &scene); err != nil {
 		return
 	}
-	h.Handler.SetStoreLimitScene(scene, typeValue)
+	h.Handler.SetStoreLimitScene(scene, typeValue, engineValue)
 	h.rd.JSON(w, http.StatusOK, nil)
 }
 
@@ -521,7 +527,8 @@ func (h *storesHandler) GetStoreLimitScene(w http.ResponseWriter, r *http.Reques
 		h.rd.JSON(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	scene := h.Handler.GetStoreLimitScene(typeValue)
+	scene := h.Handler.GetAllEngineStoreLimitScene(typeValue)
+
 	h.rd.JSON(w, http.StatusOK, scene)
 }
 
@@ -633,4 +640,17 @@ func parseStoreLimitType(typeName string) (storelimit.Type, error) {
 		}
 	}
 	return typeValue, err
+}
+
+func parseEngine(engineName string) (core.Engine, error) {
+	engineValue := core.Unspecified
+	var err error
+	if engineName != "" {
+		if value, ok := core.EngineNameValue[engineName]; ok {
+			engineValue = value
+		} else {
+			err = errors.New("unknown engine")
+		}
+	}
+	return engineValue, err
 }

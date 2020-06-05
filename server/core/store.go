@@ -36,6 +36,33 @@ const (
 	mb                   = 1 << 20         // megabyte
 )
 
+const (
+	// SpecialUseLabel is the label used to indicate special use storage.
+	SpecialUseLabel = "specialUse"
+	// SpecialUseHotRegion is the hot region value of special use label
+	SpecialUseHotRegion = "hotRegion"
+	// SpecialUseReserved is the reserved value of special use label
+	SpecialUseReserved = "reserved"
+
+	// EngineLabel is the label key used to indicate engine.
+	EngineLabel = "engine"
+	// EngineTiFlash is the tiflash value of the engine label.
+	EngineTiFlash = "tiflash"
+)
+
+type Engine int
+
+const (
+	Unspecified Engine = iota
+	TiFlash
+)
+
+// TypeNameValue indicates the name of store limit type and the enum value
+var EngineNameValue = map[string]Engine{
+	"unspecified": Unspecified,
+	EngineTiFlash: TiFlash,
+}
+
 // StoreInfo contains information about a store.
 type StoreInfo struct {
 	meta  *metapb.Store
