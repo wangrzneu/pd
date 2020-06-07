@@ -491,6 +491,14 @@ func (s *StoreInfo) GetLabelValue(key string) string {
 	return ""
 }
 
+func (s *StoreInfo) GetEngine() Engine {
+	value, ok := EngineNameValue[s.GetLabelValue(EngineLabel)]
+	if !ok {
+		return Unspecified
+	}
+	return value
+}
+
 // CompareLocation compares 2 stores' labels and returns at which level their
 // locations are different. It returns -1 if they are at the same location.
 func (s *StoreInfo) CompareLocation(other *StoreInfo, labels []string) int {

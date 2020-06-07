@@ -59,21 +59,8 @@ func (s *StoreLimiter) Collect(stats *pdpb.StoreStats) {
 	s.state.Collect((*StatEntry)(stats))
 
 	state := s.state.State()
-	rateRegionAdd := s.calculateRate(storelimit.RegionAdd, state)
-	rateRegionRemove := s.calculateRate(storelimit.RegionRemove, state)
-
-	if rateRegionAdd > 0 || rateRegionRemove > 0 {
-		if rateRegionAdd > 0 {
-			s.oc.SetAllStoresLimitAuto(rateRegionAdd, storelimit.RegionAdd)
-			log.Info("change store region add limit for cluster", zap.Stringer("state", state), zap.Float64("rate", rateRegionAdd))
-		}
-		if rateRegionRemove > 0 {
-			s.oc.SetAllStoresLimitAuto(rateRegionRemove, storelimit.RegionRemove)
-			log.Info("change store region remove limit for cluster", zap.Stringer("state", state), zap.Float64("rate", rateRegionRemove))
-		}
-		s.current = state
-		collectClusterStateCurrent(state)
-	}
+	s.oc.SetAllStoresLimitAuto(state)
+	collectClusterStateCurrent(state)
 }
 
 func collectClusterStateCurrent(state LoadState) {
@@ -86,17 +73,20 @@ func collectClusterStateCurrent(state LoadState) {
 	}
 }
 
-func (s *StoreLimiter) calculateRate(limitType storelimit.Type, engine core.Engine, state LoadState) float64 {
+// CalculateRate calculates the store limit rate according to limit type, store engine and load state
+func (s *StoreLimiter) CalculateRate(limitType storelimit.Type, engine core.Engine, state LoadState) float64 {
 	rate := float64(0)
-	switch state {
-	case LoadStateIdle:
-		rate = float64(s.scene[engine][limitType].Idle) / schedule.StoreBalanceBaseTime
-	case LoadStateLow:
-		rate = float64(s.scene[engine][limitType].Low) / schedule.StoreBalanceBaseTime
-	case LoadStateNormal:
-		rate = float64(s.scene[engine][limitType].Normal) / schedule.StoreBalanceBaseTime
-	case LoadStateHigh:
-		rate = float64(s.scene[engine][limitType].High) / schedule.StoreBalanceBaseTime
+	if s.scene[engine] != nil {
+		switch state {
+		case LoadStateIdle:
+			rate = float64(s.scene[engine][limitType].Idle) / schedule.StoreBalanceBaseTime
+		case LoadStateLow:
+			rate = float64(s.scene[engine][limitType].Low) / schedule.StoreBalanceBaseTime
+		case LoadStateNormal:
+			rate = float64(s.scene[engine][limitType].Normal) / schedule.StoreBalanceBaseTime
+		case LoadStateHigh:
+			rate = float64(s.scene[engine][limitType].High) / schedule.StoreBalanceBaseTime
+		}
 	}
 	return rate
 }

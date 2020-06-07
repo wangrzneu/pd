@@ -862,14 +862,13 @@ func (h *Handler) GetAllEngineStoreLimitScene(limitType storelimit.Type) map[str
 		jsonBytes, _ := json.Marshal(engineIgnoreScene)
 		json.Unmarshal(jsonBytes, &sceneTotal)
 	}
+	engineSpecifiedScene := make(map[string]*storelimit.Scene)
 	for n, v := range core.EngineNameValue {
 		if v != core.Unspecified {
-			scene := make(map[string]interface{})
-			jsonBytes, _ := json.Marshal(cluster.GetStoreLimiter().StoreLimitScene(limitType, v))
-			json.Unmarshal(jsonBytes, &scene)
-			sceneTotal[n] = scene
+			engineSpecifiedScene[n] = cluster.GetStoreLimiter().StoreLimitScene(limitType, v)
 		}
 	}
+	sceneTotal["Engines"] = engineSpecifiedScene
 	return sceneTotal
 }
 

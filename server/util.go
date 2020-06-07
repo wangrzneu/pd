@@ -187,10 +187,5 @@ func checkBootstrapRequest(clusterID uint64, req *pdpb.BootstrapRequest) error {
 // isTiFlashStore used to judge flash store.
 // FIXME: remove the hack way
 func isTiFlashStore(store *metapb.Store) bool {
-	for _, l := range store.GetLabels() {
-		if l.GetKey() == core.EngineLabel && l.GetValue() == core.EngineTiFlash {
-			return true
-		}
-	}
-	return false
+	return core.NewStoreInfo(store).GetEngine() == core.TiFlash
 }

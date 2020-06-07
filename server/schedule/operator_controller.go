@@ -18,6 +18,7 @@ import (
 	"container/list"
 	"context"
 	"fmt"
+	"github.com/pingcap/pd/v4/server/cluster"
 	"strconv"
 	"sync"
 	"time"
@@ -890,21 +891,28 @@ func (oc *OperatorController) SetAllStoresLimit(rate float64, mode storelimit.Mo
 }
 
 // SetAllStoresLimitAuto updates the store limit in Auto mode
-func (oc *OperatorController) SetAllStoresLimitAuto(rate float64, limitType storelimit.Type) {
+func (oc *OperatorController) SetAllStoresLimitAuto(storeLimiter *cluster.StoreLimiter, state cluster.LoadState) {
 	oc.Lock()
 	defer oc.Unlock()
 	stores := oc.cluster.GetStores()
 	for _, s := range stores {
 		sid := s.GetID()
+		engine := s.GetEngine()
 		if old, ok := oc.storesLimit[sid]; ok {
-			if old[limitType].Mode() == storelimit.Manual {
-				continue
+			for _, limitType := range storelimit.TypeNameValue {
+				if old[limitType].Mode() == storelimit.Manual {
+					continue
+				}
+				if oc.storesLimit[sid] == nil {
+					oc.storesLimit[sid] = make(map[storelimit.Type]*storelimit.StoreLimit)
+				}
+				rate := storeLimiter.CalculateRate(limitType, engine, state)
+				if rate > 0 {
+					oc.storesLimit[sid][limitType] = storelimit.NewStoreLimit(rate, storelimit.Auto, storelimit.RegionInfluence[limitType])
+					log.Info("change store limit for cluster", zap.Stringer("type", limitType), zap.Stringer("state", state), zap.Float64("rate", rate))
+				}
 			}
 		}
-		if oc.storesLimit[sid] == nil {
-			oc.storesLimit[sid] = make(map[storelimit.Type]*storelimit.StoreLimit)
-		}
-		oc.storesLimit[sid][limitType] = storelimit.NewStoreLimit(rate, storelimit.Auto, storelimit.RegionInfluence[limitType])
 	}
 }
 
