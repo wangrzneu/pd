@@ -18,7 +18,6 @@ import (
 	"container/list"
 	"context"
 	"fmt"
-	"github.com/pingcap/pd/v4/server/cluster"
 	"strconv"
 	"sync"
 	"time"
@@ -891,7 +890,7 @@ func (oc *OperatorController) SetAllStoresLimit(rate float64, mode storelimit.Mo
 }
 
 // SetAllStoresLimitAuto updates the store limit in Auto mode
-func (oc *OperatorController) SetAllStoresLimitAuto(storeLimiter *cluster.StoreLimiter, state cluster.LoadState) {
+func (oc *OperatorController) SetAllStoresLimitAuto(rates map[storelimit.Type]map[core.Engine]float64) {
 	oc.Lock()
 	defer oc.Unlock()
 	stores := oc.cluster.GetStores()
@@ -906,10 +905,13 @@ func (oc *OperatorController) SetAllStoresLimitAuto(storeLimiter *cluster.StoreL
 				if oc.storesLimit[sid] == nil {
 					oc.storesLimit[sid] = make(map[storelimit.Type]*storelimit.StoreLimit)
 				}
-				rate := storeLimiter.CalculateRate(limitType, engine, state)
+				var rate float64
+				if rates[limitType] != nil {
+					rate = rates[limitType][engine]
+				}
 				if rate > 0 {
 					oc.storesLimit[sid][limitType] = storelimit.NewStoreLimit(rate, storelimit.Auto, storelimit.RegionInfluence[limitType])
-					log.Info("change store limit for cluster", zap.Stringer("type", limitType), zap.Stringer("state", state), zap.Float64("rate", rate))
+					log.Info("change store limit for cluster", zap.Stringer("type", limitType), zap.Float64("rate", rate))
 				}
 			}
 		}

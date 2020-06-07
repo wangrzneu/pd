@@ -178,7 +178,7 @@ func NewSetAllLimitCommand() *cobra.Command {
 // NewStoreLimitSceneCommand returns a limit-scene command for store command
 func NewStoreLimitSceneCommand() *cobra.Command {
 	return &cobra.Command{
-		Use:   "limit-scene [<type>]|[<scene> <rate> <type>]",
+		Use:   "limit-scene [<type>]|[<scene> <rate> <type> <engine>]",
 		Short: "show or set the limit value for a scene",
 		Long:  "show or set the limit value for a scene, <type> can be 'region-add'(default) or 'region-remove'",
 		Run:   storeLimitSceneCommandFunc,
@@ -202,7 +202,7 @@ func storeLimitSceneCommandFunc(cmd *cobra.Command, args []string) {
 			return
 		}
 		cmd.Println(resp)
-	case 2, 3:
+	case 2, 3, 4:
 		// set limit value for a scene
 		scene := args[0]
 		if scene != "idle" &&
@@ -219,8 +219,18 @@ func storeLimitSceneCommandFunc(cmd *cobra.Command, args []string) {
 			return
 		}
 		if len(args) == 3 {
-			prefix = path.Join(prefix, fmt.Sprintf("?type=%s", args[2]))
+			switch args[2] {
+			case "region-add", "region-remove":
+				prefix = path.Join(prefix, fmt.Sprintf("?type=%s", args[2]))
+			default:
+				prefix = path.Join(prefix, fmt.Sprintf("?engine=%s", args[2]))
+			}
 		}
+
+		if len(args) == 4 {
+			prefix = path.Join(prefix, fmt.Sprintf("?type=%s&engine=%s", args[2], args[3]))
+		}
+
 		postJSON(cmd, prefix, map[string]interface{}{scene: rate})
 	}
 }

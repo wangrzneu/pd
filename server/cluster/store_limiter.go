@@ -14,13 +14,14 @@
 package cluster
 
 import (
-	"github.com/pingcap/pd/v4/server/core"
 	"sync"
 
 	"github.com/pingcap/kvproto/pkg/pdpb"
 	"github.com/pingcap/log"
+	"github.com/pingcap/pd/v4/server/core"
 	"github.com/pingcap/pd/v4/server/schedule"
 	"github.com/pingcap/pd/v4/server/schedule/storelimit"
+
 	"go.uber.org/zap"
 )
 
@@ -59,7 +60,7 @@ func (s *StoreLimiter) Collect(stats *pdpb.StoreStats) {
 	s.state.Collect((*StatEntry)(stats))
 
 	state := s.state.State()
-	s.oc.SetAllStoresLimitAuto(state)
+	s.oc.SetAllStoresLimitAuto(s.CalculateRates(state))
 	collectClusterStateCurrent(state)
 }
 
@@ -91,8 +92,21 @@ func (s *StoreLimiter) CalculateRate(limitType storelimit.Type, engine core.Engi
 	return rate
 }
 
+func (s *StoreLimiter) CalculateRates(state LoadState) map[storelimit.Type]map[core.Engine]float64 {
+	rates := make(map[storelimit.Type]map[core.Engine]float64)
+	for _, limitType := range storelimit.TypeNameValue {
+		if rates[limitType] == nil {
+			rates[limitType] = make(map[core.Engine]float64)
+		}
+		for _, engine := range core.EngineNameValue {
+			rates[limitType][engine] = s.CalculateRate(limitType, engine, state)
+		}
+	}
+	return rates
+}
+
 // ReplaceStoreLimitScene replaces the store limit values for different scenes
-func (s *StoreLimiter) ReplaceStoreLimitScene(scene *storelimit.Scene, limitType storelimit.Type, engine core.Engine, ) {
+func (s *StoreLimiter) ReplaceStoreLimitScene(scene *storelimit.Scene, limitType storelimit.Type, engine core.Engine) {
 	s.m.Lock()
 	defer s.m.Unlock()
 	if s.scene == nil {

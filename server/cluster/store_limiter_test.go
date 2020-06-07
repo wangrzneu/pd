@@ -15,6 +15,7 @@ package cluster
 
 import (
 	"context"
+	"github.com/pingcap/pd/v4/server/core"
 
 	. "github.com/pingcap/check"
 	"github.com/pingcap/kvproto/pkg/pdpb"
@@ -53,18 +54,18 @@ func (s *testStoreLimiterSuite) TestCollect(c *C) {
 
 func (s *testStoreLimiterSuite) TestStoreLimitScene(c *C) {
 	limiter := NewStoreLimiter(s.oc)
-	c.Assert(limiter.scene[storelimit.RegionAdd], DeepEquals, storelimit.DefaultScene(storelimit.RegionAdd))
-	c.Assert(limiter.scene[storelimit.RegionRemove], DeepEquals, storelimit.DefaultScene(storelimit.RegionRemove))
+	c.Assert(limiter.scene[core.Unspecified][storelimit.RegionAdd], DeepEquals, storelimit.DefaultScene(storelimit.RegionAdd))
+	c.Assert(limiter.scene[core.Unspecified][storelimit.RegionRemove], DeepEquals, storelimit.DefaultScene(storelimit.RegionRemove))
 }
 
 func (s *testStoreLimiterSuite) TestReplaceStoreLimitScene(c *C) {
 	limiter := NewStoreLimiter(s.oc)
 
 	sceneRegionAdd := &storelimit.Scene{Idle: 4, Low: 3, Normal: 2, High: 1}
-	limiter.ReplaceStoreLimitScene(sceneRegionAdd, storelimit.RegionAdd)
+	limiter.ReplaceStoreLimitScene(sceneRegionAdd, storelimit.RegionAdd, core.Unspecified)
 
-	c.Assert(limiter.scene[storelimit.RegionAdd], DeepEquals, sceneRegionAdd)
+	c.Assert(limiter.scene[core.Unspecified][storelimit.RegionAdd], DeepEquals, sceneRegionAdd)
 
 	sceneRegionRemove := &storelimit.Scene{Idle: 5, Low: 4, Normal: 3, High: 2}
-	limiter.ReplaceStoreLimitScene(sceneRegionRemove, storelimit.RegionRemove)
+	limiter.ReplaceStoreLimitScene(sceneRegionRemove, storelimit.RegionRemove, core.Unspecified)
 }
