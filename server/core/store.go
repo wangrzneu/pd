@@ -50,14 +50,17 @@ const (
 	EngineTiFlash = "tiflash"
 )
 
+// Engine indicates the engine type of a store
 type Engine int
 
 const (
+	// Unspecified indicates the engine type of a store is unspecified
 	Unspecified Engine = iota
+	// TiFlash indicates the store is a TiFlash store
 	TiFlash
 )
 
-// TypeNameValue indicates the name of store limit type and the enum value
+// EngineNameValue indicates the name of store engine type and the enum value
 var EngineNameValue = map[string]Engine{
 	"unspecified": Unspecified,
 	EngineTiFlash: TiFlash,
@@ -491,6 +494,7 @@ func (s *StoreInfo) GetLabelValue(key string) string {
 	return ""
 }
 
+// GetEngine return the engine type of the store
 func (s *StoreInfo) GetEngine() Engine {
 	value, ok := EngineNameValue[s.GetLabelValue(EngineLabel)]
 	if !ok {

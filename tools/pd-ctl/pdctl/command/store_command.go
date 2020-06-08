@@ -189,7 +189,6 @@ func storeLimitSceneCommandFunc(cmd *cobra.Command, args []string) {
 	var resp string
 	var err error
 	prefix := fmt.Sprintf("%s/limit/scene", storesPrefix)
-
 	switch len(args) {
 	case 0, 1:
 		// show all limit values
@@ -221,14 +220,14 @@ func storeLimitSceneCommandFunc(cmd *cobra.Command, args []string) {
 		if len(args) == 3 {
 			switch args[2] {
 			case "region-add", "region-remove":
-				prefix = path.Join(prefix, fmt.Sprintf("?type=%s", args[2]))
+				prefix += fmt.Sprintf("?type=%s", args[2])
 			default:
-				prefix = path.Join(prefix, fmt.Sprintf("?engine=%s", args[2]))
+				prefix += fmt.Sprintf("?engine=%s", args[2])
 			}
 		}
 
 		if len(args) == 4 {
-			prefix = path.Join(prefix, fmt.Sprintf("?type=%s&engine=%s", args[2], args[3]))
+			prefix += fmt.Sprintf("?type=%s&engine=%s", args[2], args[3])
 		}
 
 		postJSON(cmd, prefix, map[string]interface{}{scene: rate})

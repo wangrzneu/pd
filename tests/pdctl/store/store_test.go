@@ -16,6 +16,7 @@ package store_test
 import (
 	"context"
 	"encoding/json"
+	"github.com/pingcap/pd/v4/server/core"
 	"strings"
 	"testing"
 
@@ -23,6 +24,7 @@ import (
 	"github.com/pingcap/kvproto/pkg/metapb"
 	"github.com/pingcap/pd/v4/server"
 	"github.com/pingcap/pd/v4/server/api"
+	"github.com/pingcap/pd/v4/server/cluster"
 	"github.com/pingcap/pd/v4/server/schedule/storelimit"
 	"github.com/pingcap/pd/v4/tests"
 	"github.com/pingcap/pd/v4/tests/pdctl"
@@ -43,12 +45,12 @@ func (s *storeTestSuite) SetUpSuite(c *C) {
 func (s *storeTestSuite) TestStore(c *C) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	cluster, err := tests.NewTestCluster(ctx, 1)
+	testCluster, err := tests.NewTestCluster(ctx, 1)
 	c.Assert(err, IsNil)
-	err = cluster.RunInitialServers()
+	err = testCluster.RunInitialServers()
 	c.Assert(err, IsNil)
-	cluster.WaitLeader()
-	pdAddr := cluster.GetConfig().GetClientURL()
+	testCluster.WaitLeader()
+	pdAddr := testCluster.GetConfig().GetClientURL()
 	cmd := pdctl.InitCommand()
 
 	stores := []*metapb.Store{
@@ -72,13 +74,13 @@ func (s *storeTestSuite) TestStore(c *C) {
 		},
 	}
 
-	leaderServer := cluster.GetServer(cluster.GetLeader())
+	leaderServer := testCluster.GetServer(testCluster.GetLeader())
 	c.Assert(leaderServer.BootstrapCluster(), IsNil)
 
 	for _, store := range stores {
 		pdctl.MustPutStore(c, leaderServer.GetServer(), store.Id, store.State, store.Labels)
 	}
-	defer cluster.Destroy()
+	defer testCluster.Destroy()
 
 	// store command
 	args := []string{"-u", pdAddr, "store"}
@@ -252,7 +254,7 @@ func (s *storeTestSuite) TestStore(c *C) {
 	scene := &storelimit.Scene{}
 	err = json.Unmarshal(output, scene)
 	c.Assert(err, IsNil)
-	c.Assert(scene, DeepEquals, storelimit.DefaultScene(storelimit.RegionAdd))
+	c.Assert(scene, DeepEquals, cluster.DefaultScene(storelimit.RegionAdd, core.Unspecified))
 
 	// store limit-scene <scene> <rate>
 	args = []string{"-u", pdAddr, "store", "limit-scene", "idle", "200"}
@@ -267,7 +269,7 @@ func (s *storeTestSuite) TestStore(c *C) {
 	c.Assert(scene.Idle, Equals, 200)
 
 	// store limit-scene <scene> <rate> <type>
-	args = []string{"-u", pdAddr, "store", "limit-scene", "idle", "100", "region-remove"}
+	args = []string{"-u", pdAddr, "store", "limit-scene", "idle", "150", "region-remove"}
 	_, _, err = pdctl.ExecuteCommandC(cmd, args...)
 	c.Assert(err, IsNil)
 	args = []string{"-u", pdAddr, "store", "limit-scene", "region-remove"}
@@ -276,5 +278,18 @@ func (s *storeTestSuite) TestStore(c *C) {
 	c.Assert(err, IsNil)
 	err = json.Unmarshal(output, scene)
 	c.Assert(err, IsNil)
-	c.Assert(scene.Idle, Equals, 100)
+	c.Assert(scene.Idle, Equals, 150)
+
+	// store limit-scene <scene> <rate> <type> <engine>
+	args = []string{"-u", pdAddr, "store", "limit-scene", "idle", "100", "region-remove", "tiflash"}
+	_, _, err = pdctl.ExecuteCommandC(cmd, args...)
+	c.Assert(err, IsNil)
+	args = []string{"-u", pdAddr, "store", "limit-scene", "region-remove"}
+	sceneMap := make(map[string]interface{})
+	_, output, err = pdctl.ExecuteCommandC(cmd, args...)
+	c.Assert(err, IsNil)
+	c.Log(string(output))
+	err = json.Unmarshal(output, &sceneMap)
+	c.Assert(err, IsNil)
+	c.Assert(sceneMap["Engines"].(map[string]interface{})[core.EngineTiFlash].(map[string]interface{})["Idle"], Equals, float64(100))
 }

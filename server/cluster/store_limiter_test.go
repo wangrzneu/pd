@@ -54,8 +54,10 @@ func (s *testStoreLimiterSuite) TestCollect(c *C) {
 
 func (s *testStoreLimiterSuite) TestStoreLimitScene(c *C) {
 	limiter := NewStoreLimiter(s.oc)
-	c.Assert(limiter.scene[core.Unspecified][storelimit.RegionAdd], DeepEquals, storelimit.DefaultScene(storelimit.RegionAdd))
-	c.Assert(limiter.scene[core.Unspecified][storelimit.RegionRemove], DeepEquals, storelimit.DefaultScene(storelimit.RegionRemove))
+	c.Assert(limiter.scene[core.Unspecified][storelimit.RegionAdd], DeepEquals, DefaultScene(storelimit.RegionAdd, core.Unspecified))
+	c.Assert(limiter.scene[core.Unspecified][storelimit.RegionRemove], DeepEquals, DefaultScene(storelimit.RegionRemove, core.Unspecified))
+	c.Assert(limiter.scene[core.TiFlash][storelimit.RegionAdd], DeepEquals, DefaultScene(storelimit.RegionAdd, core.TiFlash))
+	c.Assert(limiter.scene[core.TiFlash][storelimit.RegionRemove], DeepEquals, DefaultScene(storelimit.RegionRemove, core.TiFlash))
 }
 
 func (s *testStoreLimiterSuite) TestReplaceStoreLimitScene(c *C) {

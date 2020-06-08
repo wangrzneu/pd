@@ -841,19 +841,20 @@ func (h *Handler) ResetTS(ts uint64) error {
 	return tsoServer.ResetUserTimestamp(ts)
 }
 
-// SetStoreLimitScene sets the limit values for differents scenes
+// SetStoreLimitScene sets the limit values for different scenes
 func (h *Handler) SetStoreLimitScene(scene *storelimit.Scene, limitType storelimit.Type, engine core.Engine) {
 	cluster := h.s.GetRaftCluster()
 	cluster.GetStoreLimiter().ReplaceStoreLimitScene(scene, limitType, engine)
 }
 
-// GetStoreLimitScene returns the limit valus for different scenes
+// GetStoreLimitScene returns the limit values for different scenes
 func (h *Handler) GetStoreLimitScene(limitType storelimit.Type, engine core.Engine) *storelimit.Scene {
 	cluster := h.s.GetRaftCluster()
 	scene := cluster.GetStoreLimiter().StoreLimitScene(limitType, engine)
 	return scene
 }
 
+// GetAllEngineStoreLimitScene returns store limit scenes of different engines
 func (h *Handler) GetAllEngineStoreLimitScene(limitType storelimit.Type) map[string]interface{} {
 	cluster := h.s.GetRaftCluster()
 	sceneTotal := make(map[string]interface{})

@@ -25,6 +25,47 @@ import (
 	"go.uber.org/zap"
 )
 
+// DefaultScene returns Scene object with default values
+func DefaultScene(limitType storelimit.Type, engine core.Engine) *storelimit.Scene {
+	defaultScene := &storelimit.Scene{
+		Idle:   100,
+		Low:    50,
+		Normal: 32,
+		High:   12,
+	}
+
+	defaultTiFlashScene := &storelimit.Scene{
+		Idle:   500,
+		Low:    250,
+		Normal: 150,
+		High:   50,
+	}
+
+	// change this if different type rate limit and engine has different default scene
+	switch engine {
+	case core.TiFlash:
+		switch limitType {
+		case storelimit.RegionAdd:
+			return defaultTiFlashScene
+		case storelimit.RegionRemove:
+			return defaultTiFlashScene
+		default:
+			return nil
+		}
+	case core.Unspecified:
+		switch limitType {
+		case storelimit.RegionAdd:
+			return defaultScene
+		case storelimit.RegionRemove:
+			return defaultScene
+		default:
+			return nil
+		}
+	default:
+		return nil
+	}
+}
+
 // StoreLimiter adjust the store limit dynamically
 type StoreLimiter struct {
 	m       sync.RWMutex
@@ -38,8 +79,12 @@ type StoreLimiter struct {
 func NewStoreLimiter(c *schedule.OperatorController) *StoreLimiter {
 	defaultScene := map[core.Engine]map[storelimit.Type]*storelimit.Scene{
 		core.Unspecified: {
-			storelimit.RegionAdd:    storelimit.DefaultScene(storelimit.RegionAdd),
-			storelimit.RegionRemove: storelimit.DefaultScene(storelimit.RegionRemove),
+			storelimit.RegionAdd:    DefaultScene(storelimit.RegionAdd, core.Unspecified),
+			storelimit.RegionRemove: DefaultScene(storelimit.RegionRemove, core.Unspecified),
+		},
+		core.TiFlash: {
+			storelimit.RegionAdd:    DefaultScene(storelimit.RegionAdd, core.TiFlash),
+			storelimit.RegionRemove: DefaultScene(storelimit.RegionRemove, core.TiFlash),
 		},
 	}
 
@@ -92,6 +137,7 @@ func (s *StoreLimiter) CalculateRate(limitType storelimit.Type, engine core.Engi
 	return rate
 }
 
+// CalculateRates calculates the store limit rates of all possible limit types and store engines according to load state
 func (s *StoreLimiter) CalculateRates(state LoadState) map[storelimit.Type]map[core.Engine]float64 {
 	rates := make(map[storelimit.Type]map[core.Engine]float64)
 	for _, limitType := range storelimit.TypeNameValue {
