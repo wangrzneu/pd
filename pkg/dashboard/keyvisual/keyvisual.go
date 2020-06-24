@@ -11,15 +11,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// +build tools
-
-package tools
+package keyvisual
 
 import (
-	_ "github.com/go-playground/overalls"
-	_ "github.com/mgechev/revive"
-	_ "github.com/pingcap/failpoint/failpoint-ctl"
-	_ "github.com/sasha-s/go-deadlock"
-	_ "github.com/swaggo/swag/cmd/swag"
-	_ "golang.org/x/tools/cmd/goimports"
+	"github.com/pingcap-incubator/tidb-dashboard/pkg/keyvisual/region"
+
+	"github.com/pingcap/pd/v4/pkg/dashboard/keyvisual/input"
+	"github.com/pingcap/pd/v4/server"
 )
+
+// GenCustomDataProvider generates a custom DataProvider for the dashboard keyvisual package.
+func GenCustomDataProvider(srv *server.Server) *region.DataProvider {
+	return &region.DataProvider{
+		PeriodicGetter: input.NewCorePeriodicGetter(srv),
+	}
+}

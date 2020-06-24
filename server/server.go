@@ -596,6 +596,14 @@ func (s *Server) GetAddr() string {
 	return s.cfg.AdvertiseClientUrls
 }
 
+// GetClientScheme returns the client URL scheme
+func (s *Server) GetClientScheme() string {
+	if len(s.cfg.Security.CertPath) == 0 && len(s.cfg.Security.KeyPath) == 0 {
+		return "http"
+	}
+	return "https"
+}
+
 // GetMemberInfo returns the server member information.
 func (s *Server) GetMemberInfo() *pdpb.Member {
 	return proto.Clone(s.member.Member()).(*pdpb.Member)
@@ -767,7 +775,7 @@ func (s *Server) SetReplicationConfig(cfg config.ReplicationConfig) error {
 		} else {
 			// NOTE: can be removed after placement rules feature is enabled by default.
 			for _, s := range raftCluster.GetStores() {
-				if !s.IsTombstone() && isTiFlashStore(s.GetMeta()) {
+				if !s.IsTombstone() && core.IsTiFlashStore(s.GetMeta()) {
 					return errors.New("cannot disable placement rules with TiFlash nodes")
 				}
 			}
@@ -796,6 +804,21 @@ func (s *Server) GetPDServerConfig() *config.PDServerConfig {
 
 // SetPDServerConfig sets the server config.
 func (s *Server) SetPDServerConfig(cfg config.PDServerConfig) error {
+	switch cfg.DashboardAddress {
+	case "auto":
+	case "none":
+	default:
+		if !strings.HasPrefix(cfg.DashboardAddress, "http") {
+			cfg.DashboardAddress = fmt.Sprintf("%s://%s", s.GetClientScheme(), cfg.DashboardAddress)
+		}
+		if !cluster.IsClientURL(cfg.DashboardAddress, s.client) {
+			return errors.Errorf("%s is not the client url of any member", cfg.DashboardAddress)
+		}
+	}
+	if err := cfg.Validate(); err != nil {
+		return err
+	}
+
 	old := s.persistOptions.GetPDServerConfig()
 	s.persistOptions.SetPDServerConfig(&cfg)
 	if err := s.persistOptions.Persist(s.storage); err != nil {
